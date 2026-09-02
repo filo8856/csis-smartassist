@@ -12,10 +12,27 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { api } from "@/lib/api";
 
+const EMPTY_AUTHORIZATION = { roles: [], permissions: [] };
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const supabase = createClient();
+
+  const loadAuthorization = async (token: string) => {
+    api.setToken(token);
+    if (typeof api.getMyAuthorization !== "function") return;
+    try {
+      const authorization = await api.getMyAuthorization();
+      setRoles(authorization.roles);
+      setPermissions(authorization.permissions);
+    } catch {
+      setRoles(EMPTY_AUTHORIZATION.roles);
+      setPermissions(EMPTY_AUTHORIZATION.permissions);
+    }
+  };
 
   useEffect(() => {
     // Get initial session
@@ -27,7 +44,10 @@ export function useAuth() {
 
         if (session) {
           setUser(session.user);
-          api.setToken(session.access_token);
+          await loadAuthorization(session.access_token);
+        } else {
+          setRoles(EMPTY_AUTHORIZATION.roles);
+          setPermissions(EMPTY_AUTHORIZATION.permissions);
         }
       } finally {
         setLoading(false);
@@ -42,7 +62,10 @@ export function useAuth() {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session) {
-        api.setToken(session.access_token);
+        void loadAuthorization(session.access_token);
+      } else {
+        setRoles(EMPTY_AUTHORIZATION.roles);
+        setPermissions(EMPTY_AUTHORIZATION.permissions);
       }
       setLoading(false);
     });
@@ -97,8 +120,26 @@ export function useAuth() {
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setRoles(EMPTY_AUTHORIZATION.roles);
+    setPermissions(EMPTY_AUTHORIZATION.permissions);
     api.setToken("");
   }, [supabase.auth]);
 
-  return { user, loading, signInWithGoogle, signInWithIdToken, signOut };
+  const hasRole = useCallback((role: string) => roles.includes(role), [roles]);
+  const hasPermission = useCallback(
+    (permission: string) => permissions.includes(permission),
+    [permissions]
+  );
+
+  return {
+    user,
+    loading,
+    roles,
+    permissions,
+    hasRole,
+    hasPermission,
+    signInWithGoogle,
+    signInWithIdToken,
+    signOut,
+  };
 }

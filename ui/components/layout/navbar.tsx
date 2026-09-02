@@ -52,7 +52,10 @@ function ChevronDownIcon() {
 }
 
 export default function Navbar({ profile }: NavbarProps) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, permissions } = useAuth();
+  const canAccessAdmin = permissions.some((permission) =>
+    ["bookings.read_all", "rag.read", "users.read"].includes(permission)
+  );
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -102,7 +105,7 @@ export default function Navbar({ profile }: NavbarProps) {
       </div>
 
       <div className={styles.right}>
-        {profile?.is_admin && (
+        {canAccessAdmin && (
           <Link
             href="/admin"
             className={`${styles.navLink} ${styles.adminLink} ${
@@ -182,7 +185,7 @@ export default function Navbar({ profile }: NavbarProps) {
               {item.label}
             </Link>
           ))}
-          {profile?.is_admin && (
+          {canAccessAdmin && (
             <Link
               href="/admin"
               className={styles.mobileNavLink}

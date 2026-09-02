@@ -32,7 +32,7 @@ const INTEREST_OPTIONS = [
 ];
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, roles } = useAuth();
   const { profile, updateProfile } = useProfile(user?.id);
   const [editData, setEditData] = useState({
     full_name: "",
@@ -101,7 +101,7 @@ export default function ProfilePage() {
           <div className={styles.field}>
             <span className={styles.label}>Role</span>
             <span className={styles.value}>
-              {profile.is_admin ? "Administrator" : "User"}
+              {roles.length ? roles.join(", ") : "User"}
             </span>
           </div>
         </div>

@@ -1,0 +1,13 @@
+@use 'variables' as *;
+
+.panel { display: flex; flex-direction: column; gap: $space-5; }
+.toolbar { display: flex; align-items: center; gap: $space-3; color: $text-secondary; font-size: $text-sm; }
+.toolbar select { background: $bg-secondary; color: $text-primary; border: 1px solid $border-subtle; padding: $space-2 $space-3; }
+.list { display: flex; flex-direction: column; gap: $space-2; }
+.user { display: flex; justify-content: space-between; align-items: center; gap: $space-4; padding: $space-4; border: 1px solid $border-subtle; }
+.user strong, .user span { display: block; }
+.user span { color: $text-tertiary; font-size: $text-sm; margin-top: $space-1; }
+.roles { display: flex; flex-wrap: wrap; gap: $space-2; margin-top: $space-3; }
+.role, .assign { border: 1px solid $border-subtle; background: transparent; color: $text-secondary; padding: $space-1 $space-2; cursor: pointer; font-size: $text-xs; }
+.assign { color: $accent-primary; }
+.status { color: $text-tertiary; }

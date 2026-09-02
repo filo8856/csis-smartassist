@@ -7,26 +7,37 @@
  * 1. Booking Approval Matrix — review and approve/reject booking requests
  * 2. RAG Pipeline Dashboard — sync knowledge base from Google Drive
  *
- * Access restricted to users with is_admin=true.
+ * Sections are restricted by application permissions.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useProfile } from "@/lib/hooks/useProfile";
 import { Lock } from "lucide-react";
 import AdminBookingTable from "@/components/bookings/admin-booking-table";
 import RagDashboard from "@/components/dashboard/rag-dashboard";
+import UserRoleManagement from "@/components/dashboard/user-role-management";
 import styles from "./page.module.scss";
 
-type AdminTab = "bookings" | "rag";
+type AdminTab = "bookings" | "rag" | "users";
 
 export default function AdminPage() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { profile } = useProfile(user?.id);
   const [activeTab, setActiveTab] = useState<AdminTab>("bookings");
 
   // Access control
-  if (!profile?.is_admin) {
+  const canManageBookings = hasPermission("bookings.read_all");
+  const canManageContent = hasPermission("rag.write");
+  const canManageUsers = hasPermission("users.roles.manage");
+
+  useEffect(() => {
+    if (activeTab === "bookings" && !canManageBookings) {
+      setActiveTab(canManageContent ? "rag" : "users");
+    }
+  }, [activeTab, canManageBookings, canManageContent]);
+
+  if (!canManageBookings && !canManageContent && !canManageUsers) {
     return (
       <div className={styles.page}>
         <div className={styles.accessDenied}>
@@ -55,6 +66,7 @@ export default function AdminPage() {
           }`}
           onClick={() => setActiveTab("bookings")}
           id="tab-bookings"
+          hidden={!canManageBookings}
         >
           Booking Approvals
         </button>
@@ -64,17 +76,28 @@ export default function AdminPage() {
           }`}
           onClick={() => setActiveTab("rag")}
           id="tab-rag"
+          hidden={!canManageContent}
         >
           RAG Pipeline
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === "users" ? styles.tabActive : ""}`}
+          onClick={() => setActiveTab("users")}
+          id="tab-users"
+          hidden={!canManageUsers}
+        >
+          User Roles
         </button>
       </div>
 
       <div className={styles.section}>
-        {activeTab === "bookings" ? (
+        {activeTab === "bookings" && canManageBookings ? (
           <AdminBookingTable userId={user!.id} />
-        ) : (
+        ) : activeTab === "rag" && canManageContent ? (
           <RagDashboard />
-        )}
+        ) : activeTab === "users" && canManageUsers ? (
+          <UserRoleManagement />
+        ) : null}
       </div>
     </div>
   );

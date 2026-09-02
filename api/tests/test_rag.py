@@ -38,7 +38,7 @@ MOCK_DB_FILES = [
 @pytest.fixture
 def mock_admin_auth():
     with patch("routes.rag._extract_user_id", return_value="admin-user"), \
-         patch("routes.rag._require_admin", return_value=None):
+         patch("routes.rag.require_permission", return_value=None):
         yield
 
 @pytest.fixture

@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from core.config import get_settings
 from core.database import get_supabase_client
 from services.llm.hybrid import get_hybrid_client
+from services.authorization import extract_user_id, require_permission
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rag", tags=["rag"])
@@ -67,25 +68,7 @@ class RagStatsResponse(BaseModel):
 
 
 def _extract_user_id(authorization: str) -> str:
-    """Validate JWT and extract user ID."""
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header.")
-    token = authorization.removeprefix("Bearer ").strip()
-    db = get_supabase_client()
-    try:
-        return db.auth.get_user(token).user.id
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token.")
-
-
-def _require_admin(user_id: str) -> None:
-    """Verify admin privileges."""
-    db = get_supabase_client()
-    profile = (
-        db.table("profiles").select("is_admin").eq("id", user_id).single().execute()
-    )
-    if not profile.data or not profile.data.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Admin access required.")
+    return extract_user_id(authorization)
 
 
 # ── Google Drive Helpers ────────────────────────────────────────────────────
@@ -272,10 +255,9 @@ async def get_rag_delta(authorization: str = Header(...)):
     and deleted files (in DB but not in Drive).
     """
     user_id = _extract_user_id(authorization)
-    _require_admin(user_id)
+    require_permission(user_id, "rag.write")
 
     db = get_supabase_client()
-    print("DB OBJECT IS:", db)
     # Get current DB state
     db_files = db.table("rag_files").select("gdrive_id, md5_checksum, name").execute()
     db_map: dict[str, dict] = {f["gdrive_id"]: f for f in (db_files.data or [])}
@@ -328,7 +310,7 @@ async def sync_single_file(
     maintaining an O(1) memory footprint per request.
     """
     user_id = _extract_user_id(authorization)
-    _require_admin(user_id)
+    require_permission(user_id, "rag.write")
 
     db = get_supabase_client()
     llm = get_hybrid_client()
@@ -418,7 +400,7 @@ async def delete_rag_file(
 ):
     """Remove a file and all its chunks from the RAG index."""
     user_id = _extract_user_id(authorization)
-    _require_admin(user_id)
+    require_permission(user_id, "rag.write")
 
     db = get_supabase_client()
     result = db.table("rag_files").delete().eq("gdrive_id", gdrive_id).execute()
@@ -433,7 +415,7 @@ async def delete_rag_file(
 async def get_rag_stats(authorization: str = Header(...)):
     """Return RAG pipeline statistics: file count, chunk count, per-file details."""
     user_id = _extract_user_id(authorization)
-    _require_admin(user_id)
+    require_permission(user_id, "rag.write")
 
     db = get_supabase_client()
 

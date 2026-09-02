@@ -55,7 +55,7 @@ def mock_supabase():
 
 @pytest.fixture
 def mock_admin_check():
-    with patch("routes.booking._require_admin") as mock:
+    with patch("routes.booking.require_permission") as mock:
         yield mock
 
 FULL_MOCK_BOOKING = {

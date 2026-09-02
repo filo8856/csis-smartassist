@@ -7,10 +7,12 @@
 
 import type {
   Booking,
+  AuthorizationState,
   ChatResponse,
   ChatSession,
   DeltaResponse,
   Message,
+  ManagedUser,
   RagStats,
   Room,
   SyncResult,
@@ -23,6 +25,27 @@ class APIClient {
 
   setToken(token: string): void {
     this.token = token;
+  }
+
+  async getMyAuthorization(): Promise<AuthorizationState> {
+    return this.request<AuthorizationState>("/users/me/authorization");
+  }
+
+  async listUsers(): Promise<ManagedUser[]> {
+    return this.request<ManagedUser[]>("/users");
+  }
+
+  async assignRole(userId: string, role: string): Promise<void> {
+    await this.request(`/users/${userId}/roles`, {
+      method: "POST",
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  async removeRole(userId: string, role: string): Promise<void> {
+    await this.request(`/users/${userId}/roles/${encodeURIComponent(role)}`, {
+      method: "DELETE",
+    });
   }
 
   private async request<T>(

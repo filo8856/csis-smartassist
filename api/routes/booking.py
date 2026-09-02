@@ -17,6 +17,11 @@ from pydantic import BaseModel
 
 from core.database import get_supabase_client
 from core.rooms import get_all_rooms, get_room_by_id
+from services.authorization import (
+    extract_user_id,
+    get_user_ids_with_permission,
+    require_permission,
+)
 from services.calendar import create_calendar_event
 from services.gmail import send_admin_new_booking_notification, send_booking_notification
 
@@ -63,31 +68,7 @@ class BookingResponse(BaseModel):
 
 
 def _extract_user_id(authorization: str) -> str:
-    """Validate JWT and extract user ID."""
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header.")
-
-    token = authorization.removeprefix("Bearer ").strip()
-    db = get_supabase_client()
-    try:
-        user_response = db.auth.get_user(token)
-        return user_response.user.id
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token.")
-
-
-def _require_admin(user_id: str) -> None:
-    """Verify the user has admin privileges."""
-    db = get_supabase_client()
-    profile = (
-        db.table("profiles")
-        .select("is_admin")
-        .eq("id", user_id)
-        .single()
-        .execute()
-    )
-    if not profile.data or not profile.data.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Admin access required.")
+    return extract_user_id(authorization)
 
 
 # ── Booking Endpoints ───────────────────────────────────────────────────────
@@ -164,13 +145,12 @@ async def create_booking(
     requester_name = requester.data.get("full_name", "A student") if requester.data else "A student"
 
     # Fetch all admins to notify
-    admins = (
-        db.table("profiles")
-        .select("email")
-        .eq("is_admin", True)
-        .execute()
-    )
-    admin_emails = [admin["email"] for admin in admins.data if admin.get("email")]
+    admin_ids = get_user_ids_with_permission("bookings.approve")
+    admin_emails = []
+    for admin_id in admin_ids:
+        admin = db.table("profiles").select("email").eq("id", admin_id).single().execute()
+        if admin.data and admin.data.get("email"):
+            admin_emails.append(admin.data["email"])
 
     if admin_emails:
         asyncio.create_task(
@@ -201,7 +181,7 @@ async def list_bookings(
     query = db.table("bookings").select("*")
 
     if all_users:
-        _require_admin(user_id)
+        require_permission(user_id, "bookings.read_all")
     else:
         query = query.eq("user_id", user_id)
 
@@ -233,7 +213,7 @@ async def get_booking(
 
     # Allow access if owner or admin
     if result.data["user_id"] != user_id:
-        _require_admin(user_id)
+        require_permission(user_id, "bookings.read_all")
 
     return result.data
 
@@ -285,7 +265,7 @@ async def unlock_booking(
     
     # Allow unlock if user owns it, or if admin.
     if booking["user_id"] != user_id:
-        _require_admin(user_id)
+        require_permission(user_id, "bookings.read_all")
 
     update_data = {
         "is_locked": False,
@@ -359,13 +339,13 @@ async def update_booking_status(
     and sends an email notification to the requester.
     """
     user_id = _extract_user_id(authorization)
-    _require_admin(user_id)
     db = get_supabase_client()
 
     if body.status not in ("approved", "rejected"):
         raise HTTPException(
             status_code=400, detail="Status must be 'approved' or 'rejected'."
         )
+    require_permission(user_id, f"bookings.{body.status}")
 
     # Fetch the booking
     booking_result = (

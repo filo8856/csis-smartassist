@@ -69,7 +69,6 @@ export function useProfile(userId: string | undefined) {
         year: formData.year,
         interests: formData.interests,
         synthesized_memory: "",
-        is_admin: false,
       };
 
       const { data, error } = await supabase

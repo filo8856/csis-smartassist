@@ -16,9 +16,22 @@ export interface Profile {
   year: number | null;
   interests: string[];
   synthesized_memory: string;
-  is_admin: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface AuthorizationState {
+  roles: string[];
+  permissions: string[];
+}
+
+export interface ManagedUser {
+  id: string;
+  email: string;
+  full_name: string | null;
+  academic_role: Profile["academic_role"];
+  department: string | null;
+  roles: string[];
 }
 
 export interface ChatSession {
