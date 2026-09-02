@@ -104,6 +104,34 @@ JOIN public.roles r ON r.name = 'super_admin'
 WHERE p.is_admin = TRUE
 ON CONFLICT DO NOTHING;
 
+INSERT INTO public.user_roles (user_id, role_id)
+SELECT p.id, r.id
+FROM public.profiles p
+JOIN public.roles r ON r.name = 'student'
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.user_roles ur WHERE ur.user_id = p.id
+)
+ON CONFLICT DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.assign_default_student_role()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    INSERT INTO public.user_roles (user_id, role_id)
+    SELECT NEW.id, r.id FROM public.roles r WHERE r.name = 'student'
+    ON CONFLICT DO NOTHING;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_profile_created_assign_student_role ON public.profiles;
+CREATE TRIGGER on_profile_created_assign_student_role
+    AFTER INSERT ON public.profiles
+    FOR EACH ROW EXECUTE FUNCTION public.assign_default_student_role();
+
 CREATE OR REPLACE FUNCTION public.user_has_permission(required_permission TEXT)
 RETURNS BOOLEAN
 LANGUAGE sql
